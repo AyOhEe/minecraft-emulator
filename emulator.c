@@ -241,5 +241,6 @@ int main(int argc, char* argv[]) {
         operations[opcode](instruction);
 
         dump_registers();
+        usleep(500*1000);
     }
 }
