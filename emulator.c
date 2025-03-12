@@ -10,13 +10,23 @@ unsigned int programCounter = 0;
 unsigned int carryFlag = 0;
 unsigned int haltFlag = 0;
 
-short a = 0;
-short b = 0;
+
+typedef union {
+    short asSigned;
+    unsigned short asUnsigned;
+} twoTypeRegister;
+twoTypeRegister a = { .asUnsigned = 0 };
+twoTypeRegister b = { .asUnsigned = 0 };
 
 
 
 #define OPCODE_BITMASK 0b11111111000000000000000000000000
 #define OPCODE_BITSHIFT 24
+
+#define LRA_SP 0
+#define LRA_PC 1
+#define LRA_CF 2
+
 
 //instructions
 void hlt(unsigned int instruction) {
@@ -25,97 +35,97 @@ void hlt(unsigned int instruction) {
 }
 
 void add(unsigned int instruction) {
-    carryFlag = ((int)a + (int)b) > 0x7FFF;
-    a = a + b;
+    carryFlag = (a.asUnsigned + b.asUnsigned) > 0x7FFF;
+    a.asSigned = a.asSigned + b.asSigned;
     programCounter += 4;
 }
 void sub(unsigned int instruction) {
-    carryFlag = ((int)a - (int)b) < -0x8000;
-    a = a - b;
+    carryFlag = (a.asUnsigned - b.asUnsigned) < -0x8000;
+    a.asSigned = a.asSigned - b.asSigned;
     programCounter += 4;
 }
 void mul(unsigned int instruction) {
-    a = a * b;
+    a.asSigned = a.asSigned * b.asSigned;
     programCounter += 4;
 }
 void div(unsigned int instruction) {
-    a = a / b;
+    a.asSigned = a.asSigned / b.asSigned;
     programCounter += 4;
 }
 
 
 void ltb(unsigned int instruction) {
-    a = a < b;
+    a.asSigned = a.asSigned < b.asSigned;
     programCounter += 4;
 }
 void bsr(unsigned int instruction) {
-    a = a >> b;
+    a.asSigned = a.asSigned >> b.asSigned;
     programCounter += 4;
 }
 void bsl(unsigned int instruction) {
-    a = a << b;
+    a.asSigned = a.asSigned << b.asSigned;
     programCounter += 4;
 }
 void mod(unsigned int instruction) {
-    a = a % b;
+    a.asSigned = a.asSigned % b.asSigned;
     programCounter += 4;
 }
 
 
 void bio(unsigned int instruction) {
-    a = a | b;
+    a.asUnsigned = a.asUnsigned | b.asUnsigned;
     programCounter += 4;
 }
 void bia(unsigned int instruction) {
-    a = a & b;
+    a.asUnsigned = a.asUnsigned & b.asUnsigned;
     programCounter += 4;
 }
 void bix(unsigned int instruction) {
-    a = a ^ b;
+    a.asUnsigned = a.asUnsigned ^ b.asUnsigned;
     programCounter += 4;
 }
 void bin(unsigned int instruction) {
-    a = ~a;
+    a.asUnsigned = ~a.asUnsigned;
     programCounter += 4;
 }
 
 void blo(unsigned int instruction) {
-    a = (a != 0) || (b != 0);
+    a.asUnsigned = (a.asUnsigned != 0) || (b.asUnsigned != 0);
     programCounter += 4;
 }
 void bla(unsigned int instruction) {
-    a = (a != 0) && (b != 0);
+    a.asUnsigned = (a.asUnsigned != 0) && (b.asUnsigned != 0);
     programCounter += 4;
 }
 void blx(unsigned int instruction) {
-    a = (a != 0) ^ (b != 0);
+    a.asUnsigned = (a.asUnsigned != 0) ^ (b.asUnsigned != 0);
     programCounter += 4;
 }
 void bln(unsigned int instruction) {
-    a = a != 0;
+    a.asUnsigned = a.asUnsigned != 0;
     programCounter += 4;
 }
 
 void teq(unsigned int instruction) {
-    a = a == b;
+    a.asUnsigned = a.asUnsigned == b.asUnsigned;
     programCounter += 4;
 }
 
 
 void jmp(unsigned int instruction) {
-    programCounter = b;
+    programCounter = b.asUnsigned;
 }
 void jez(unsigned int instruction) {
-    if (a == 0) {
-        programCounter = b;
+    if (a.asUnsigned == 0) {
+        programCounter = b.asUnsigned;
     }
     else {
         programCounter += 4;
     }
 }
 void jnz(unsigned int instruction) {
-    if (a != 0) {
-        programCounter = b;
+    if (a.asUnsigned != 0) {
+        programCounter = b.asUnsigned;
     }
     else {
         programCounter += 4;
@@ -124,15 +134,15 @@ void jnz(unsigned int instruction) {
 
 
 void lia(unsigned int instruction) {
-    a = instruction & 0x0000FFFF;
+    a.asUnsigned = instruction & 0x0000FFFF;
     programCounter += 4;
 }
 void lib(unsigned int instruction) {
-    b = instruction & 0x0000FFFF;
+    b.asUnsigned = instruction & 0x0000FFFF;
     programCounter += 4;
 }
 void swp(unsigned int instruction) {
-    int c = a;
+    twoTypeRegister c = a;
 
     a = b;
     b = c;
@@ -141,42 +151,42 @@ void swp(unsigned int instruction) {
 }
 
 void lma(unsigned int instruction) {
-    a = (memory[b] << 8) + memory[b + 1];
+    a.asUnsigned = (memory[b.asUnsigned] << 8) + memory[b.asUnsigned + 1];
     programCounter += 4;
 }
 void sma(unsigned int instruction) {
-    memory[b + 0] = (a & 0xFF00) >> 8;
-    memory[b + 1] =  a & 0x00FF;
+    memory[b.asUnsigned + 0] = (a.asUnsigned & 0xFF00) >> 8;
+    memory[b.asUnsigned + 1] =  a.asUnsigned & 0x00FF;
     programCounter += 4;
 }
-void lra(unsigned int registerIdentifier) {
+void lra(unsigned int instruction) {
     programCounter += 4;
-    switch(registerIdentifier) {
-        case 0:
-            a = stackPointer;
+    switch(instruction & 0b11) {
+        case LRA_SP:
+            a.asUnsigned = stackPointer;
             return;
-        case 1:
-            a = programCounter;
+        case LRA_PC:
+            a.asUnsigned = programCounter;
             return;
-        case 2:
-            a = carryFlag;
+        case LRA_CF:
+            a.asUnsigned = carryFlag;
             return;
     }
 
-    printf("Invalid lra identifier: %d", registerIdentifier);
+    printf("Invalid lra identifier: %d", instruction & 0b11);
     hlt(0);
 }
 
 void pop(unsigned int instruction) {
-    a = (memory[stackPointer] << 8) + memory[stackPointer + 1];
+    a.asUnsigned = (memory[stackPointer - 2] << 8) + memory[stackPointer - 1];
     stackPointer -= 2;
     programCounter += 4;
 }
 void psh(unsigned int instruction) {
+    memory[stackPointer + 0] = (a.asUnsigned & 0xFF00) >> 8;
+    memory[stackPointer + 1] =  a.asUnsigned & 0x00FF;
+    
     stackPointer += 2;
-
-    memory[stackPointer + 0] = (a & 0xFF00) >> 8;
-    memory[stackPointer + 1] =  a & 0x00FF;
     programCounter += 4;
 }
 
@@ -211,7 +221,7 @@ const char* opnames[32] = {
 
 
 void dump_registers() {
-    printf("a=%i b=%i sp=%i pc=%i cf=%i hf=%i\n", a, b, stackPointer, programCounter, carryFlag, haltFlag);
+    printf("a=%i b=%i sp=%i pc=%i cf=%i hf=%i\n", a.asUnsigned, b.asUnsigned, stackPointer, programCounter, carryFlag, haltFlag);
 }
 
 
